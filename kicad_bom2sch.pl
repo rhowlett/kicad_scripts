@@ -1,9 +1,6 @@
 #!/usr/bin/perl
 
 use Getopt::Long;
-use lib "$ENV{HOME}/Dropbox/bin/perl";
-use lib "$ENV{HOME}/Dropbox/bin/kicad_scripts";
-use show_options;
 use Text::CSV_PP;
 
 sub print_help { warn "\n
@@ -497,6 +494,32 @@ sub check_options
 
   if ($OPTIONS{help}) {&print_help} # this will exit the program
   return(%OPTIONS);
+}
+
+# NOTE: this is the format to make this work
+# my %option_H;
+#  GetOptions( \%option_H,
+#    "help"   => ,	# flag/boolean (0=false|1=true)
+#    "file=s" => ,	# string
+#    "name=s" => ,	# string
+#    "grep=s" => ,	# string
+#    "debug=i"=> ,	# integer
+#    "verbose"=> );	# flag/boolean (0=false|1=true)
+# &show_options(\%option_H);
+
+sub show_options
+{
+  my ($hash_ref) = shift;
+  my %option_H = %$hash_ref;
+  if ($option_H{"verbose"})
+  {
+    warn "Checking Options for $0\n";
+    warn "VERBOSE - Options sellected are as follows:\n";
+    foreach my $KEY (keys %option_H)
+    {
+      warn "  $KEY = $option_H{$KEY}\n";
+    }
+  }
 }
 
 sub end_program
