@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 temp_file=/tmp/temp_list.txt
 rm -f $temp_file
 
@@ -25,8 +26,8 @@ then
     done
   done
 else
-  print "Error - need a schematic or project name without the (.sch or .pro) extention"
-  print "USAGE - $0 <project_name>"
+  echo "Error - need a schematic or project name without the (.sch or .pro) extention"
+  echo "USAGE - $0 <project_name>"
   exit 1
 fi
 

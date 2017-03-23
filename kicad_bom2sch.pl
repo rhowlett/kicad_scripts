@@ -1,6 +1,9 @@
 #!/usr/bin/perl
 
 use Getopt::Long;
+use lib "$ENV{HOME}/Dropbox/bin/perl";
+use lib "$ENV{HOME}/Dropbox/bin/kicad_scripts";
+use show_options;
 use Text::CSV_PP;
 
 sub print_help { warn "\n
@@ -88,15 +91,15 @@ sub print_CSV_values
   {
     if ($count == 0 )
     {
-      print "\"$values[$count]\"";
+      warn "\"$values[$count]\"";
     }
     else
     {
-      print ",\"$values[$count]\"";
+      warn ",\"$values[$count]\"";
     }
       $count++;
   }
-  print "\n";
+  warn "\n";
 }
 
 #------------------------------------------------------------------------------
@@ -118,7 +121,7 @@ sub read_sbomfile($) #wanted to see if this really works, with the ($) and it do
   my $REF_INDEX;
   my $QUANT_INDEX;
 
-  warn "--S-- read_PART_file START\n" if ($OPTIONS{verbose});
+  warn "--S-- read_sbomfile START\n" if ($OPTIONS{verbose});
 
   open ( SBOM , "<$OPTIONS{sbom}" ) or &end_program("ERROR opening the bom file $OPTIONS{sbom}, please check the name or generate a new file using xxx");
 
@@ -176,6 +179,12 @@ sub read_sbomfile($) #wanted to see if this really works, with the ($) and it do
         }
         $INDEX++;
       }
+      if (!$PART_INDEX) # In the off chance there isn't a Part Number field make one
+      {
+        $PART_INDEX = $INDEX;
+        $OPTIONS{bom_field_order} .= ",Part Number";
+        $REF_OPTIONS_H->{'bom_field_order'} .= ",Part Number"; #Note this will put in the orignal hash
+      }
     }
     else # Look at remaining lines for data, now that the first line is maped, 
     {
@@ -191,11 +200,15 @@ sub read_sbomfile($) #wanted to see if this really works, with the ($) and it do
       &print_CSV_values(@FIELDS) if ($OPTIONS{debug} == 2);
       my @REFS = split(/ /,$FIELDS[$REF_INDEX]);
       my $PART_VALUE = $FIELDS[$VALUE_INDEX];
+      $PART_VALUE =~ s/\s+/-/g;
       my $PART_FOOTPRINT = $FIELDS[$FOOTPRINT_INDEX];
       my $SHORT_FOOTPRINT = $PART_FOOTPRINT;
       $SHORT_FOOTPRINT =~ s/Custom://;
       $SHORT_FOOTPRINT =~ s/://;
-      $PART_VALUE =~ s/\s+/-/g;
+      if (!$FIELDS[$PART_INDEX])
+      {
+        $FIELDS[$PART_INDEX] = "";
+      }
       my $PART_NUMBER = $FIELDS[$PART_INDEX];
       my $REF_PREFIX;
 
@@ -209,10 +222,11 @@ sub read_sbomfile($) #wanted to see if this really works, with the ($) and it do
         # If the part has the default "Value" then set the part to the RefPrefix:Value_Footprint
         $REF_PREFIX = $REFERENCE;
         $REF_PREFIX =~ s/\d+//;
-        if ($PART_NUMBER eq "Value" or $PART_NUMBER eq "")
+        if ($PART_NUMBER eq "Value" or $PART_NUMBER eq "" or $PART_NUMBER eq "NA")
         {
           $PART_NUMBER = $REF_PREFIX . ":" . $PART_VALUE . "_" . $SHORT_FOOTPRINT;
-          warn " -INFO- Changing part name from \"$FIELDS[$PART_INDEX]\" to $PART_NUMBER\n" if $OPTIONS{verbose};
+          #$PART_NUMBER = $PART_VALUE . ":" . $SHORT_FOOTPRINT;
+          warn " -W- Changing part name from \"$FIELDS[$PART_INDEX]\" to $PART_NUMBER\n" if $OPTIONS{verbose};
           $FIELDS[$PART_INDEX] = $PART_NUMBER; # likely don't need to do this since $PART_NUMBER is what is used, but you never know...
         }
         # -TEST_PART_NAME:End- test the name of the part name to determine if it is the DEFAULT value
@@ -228,7 +242,7 @@ sub read_sbomfile($) #wanted to see if this really works, with the ($) and it do
           {
             if (!$BOM_PART_HASH{$PART_NUMBER}{$HEADER_ARRAY[$VALUE_INDEX]})
             {
-              warn " -INFO- There are $FIELD_VAL $PART_NUMBER parts.\n" if $OPTIONS{verbose};
+              warn " -I- There is/are $FIELD_VAL $PART_NUMBER part(s).\n" if $OPTIONS{verbose};
             }
           }
           else # Everything else
@@ -289,9 +303,10 @@ sub print_schematic
   my $Reference;
   my $Value;
   my @HEADER_ARRAY = split(/,/,$OPTIONS{bom_field_order});
-  my $TOTAL_FIELDS = scalar @HEADER_ARRAY;
+  my $TOTAL_FIELDS = scalar @HEADER_ARRAY - 1;
   my $LAST_FIELD_NUMBER;
   my $LAST_FIELD_OTHER;
+  my $WARNING = 0 if $OPTINOS{verbose};
 
   warn "opening file $OPTIONS{sch}\n" if ($OPTIONS{verbose});
   open ( SCH , "<$OPTIONS{sch}" ) or &end_program("could not open file $OPTIONS{sch}");
@@ -307,10 +322,15 @@ sub print_schematic
       $LAST_FIELD = 0;
       $print_line = 0; # stop printing lines and start storing component info
       $virtual_part = 0;
+      $WARNING = 0;
       push @COMP_ARRAY, $NEW_line; # start pushing conponent info onto the COMP_ARRAY 
     }
     elsif ( $NEW_line =~ m/^\$EndComp/) 
     { 
+      if ($WARNING and $OPTIONS{verbose})
+      {
+        warn "-W- Made changes to part with Reference $Reference \n";
+      }
       $ACTIVE = ""; #this concludes all the info for this componenet, time to print
       foreach (@COMP_ARRAY) { print "$_\n";} #print the contents of the new component
       @COMP_ARRAY =(); # clear the array for the next component
@@ -360,6 +380,7 @@ sub print_schematic
           warn "-I- found Reference $Reference\n" if ( $OPTIONS{verbose} );
           push @COMP_ARRAY, $NEW_line; # start pushing conponent info onto the COMP_ARRAY 
         }  
+        $LAST_FIELD_NUMBER = 0;
       }
       # - VALUE - Header Column Name is Value
       elsif ( $virtual_part )
@@ -377,9 +398,11 @@ sub print_schematic
         }
         else
         {
-          warn "  -I- Change Value:$Value changing to $REFERENCE_HASH{$Reference}{Value}\n" if ( $OPTIONS{verbose} );
+          warn "  -W- Change Value:$Value changing to $REFERENCE_HASH{$Reference}{Value}\n" if ( $OPTIONS{verbose} );
           push @COMP_ARRAY, "F 1 \"$REFERENCE_HASH{$Reference}{Value}\" $Other"; # start pushing conponent info onto the COMP_ARRAY 
+          $WARNING = 1 if ($OPTIONS{verbose});
         }
+        $LAST_FIELD_NUMBER = 1;
       }
       # - FOOTPRINT - Header Column Name is Footprint
       elsif ( $NEW_line =~ m/^F\s+2\s+\"(.*)\"\s+(.*)/) 
@@ -393,9 +416,11 @@ sub print_schematic
         }
         else
         {
-          warn "  -I- Change Footprint:$Footprint changing to $REFERENCE_HASH{$Reference}{Footprint}\n" if ( $OPTIONS{verbose} );
+          warn "  -W- Change Footprint:$Footprint changing to $REFERENCE_HASH{$Reference}{Footprint}\n" if ( $OPTIONS{verbose} );
           push @COMP_ARRAY, "F 2 \"$REFERENCE_HASH{$Reference}{Footprint}\" $Other"; # start pushing conponent info onto the COMP_ARRAY 
+          $WARNING = 1 if ($OPTIONS{verbose});
         }
+        $LAST_FIELD_NUMBER = 2;
       }
       # - DOCUMENT - Header Column Name is Datasheet
       elsif ( $NEW_line =~ m/^F\s+3\s+\"(.*)\"\s+(.*)/) 
@@ -409,48 +434,54 @@ sub print_schematic
         }
         else
         {
-          warn "  -I- Change Document:$Datasheet changing to $REFERENCE_HASH{$Reference}{Datasheet}\n" if ( $OPTIONS{verbose} );
+          warn "  -W- Change Document:$Datasheet changing to $REFERENCE_HASH{$Reference}{Datasheet}\n" if ( $OPTIONS{verbose} );
           push @COMP_ARRAY, "F 3 \"$REFERENCE_HASH{$Reference}{Datasheet}\" $Other"; # start pushing conponent info onto the COMP_ARRAY 
+          $WARNING = 1 if ($OPTIONS{verbose});
         }
+        $LAST_FIELD_NUMBER = 3;
+        $LAST_FIELD = 1;
       }
       # - FIELD N -
       elsif ( $NEW_line =~ m/^F\s+(\S+)\s+\"(.*)\"\s+(.*)\s+\"(.*)\"/) 
       { 
-        my $Fieldnumber = $1;
-        my $Fieldvalue = $2;
+        my $FieldNumber = $1;
+        my $FieldValue = $2;
         my $Other = $3;
         my $Fieldname = $4;
-        my $HeaderColumnName = $HEADER_ARRAY[$Fieldnumber];
-        $LAST_FIELD_NUMBER = $Fieldnumber;
+        my $HeaderColumnName = $HEADER_ARRAY[$FieldNumber];
+        $LAST_FIELD_NUMBER = $FieldNumber;
         $LAST_FIELD_OTHER = $Other;
         $LAST_FIELD = 1;
-        if ( $Fieldnumber <= $TOTAL_FIELDS )
+        if ( $FieldNumber <= $TOTAL_FIELDS )
         {
-          if ( ($Fieldname eq $HeaderColumnName) and ($Fieldvalue eq $REFERENCE_HASH{$Reference}{$HeaderColumnName}) )
+          if ( ($Fieldname eq $HeaderColumnName) and ($FieldValue eq $REFERENCE_HASH{$Reference}{$HeaderColumnName}) )
           {
-            warn "  -I- Same F $Fieldnumber with Value:$FieldValue and Field Name :$Fieldname\n" if ( $OPTIONS{verbose} );
+            warn "  -I- Same F $FieldNumber with Value:$FieldValue and Field Name :$Fieldname\n" if ( $OPTIONS{verbose} );
             push @COMP_ARRAY, $NEW_line; # start pushing conponent info onto the COMP_ARRAY 
           }
           else
           {
-            warn "  -W- Change F $Fieldnumber with Value:$FieldValue to $REFERENCE_HASH{$Reference}{$HeaderColumnName} and Field Name:$Fieldname to $HeaderColumnName\n" if ( $OPTIONS{verbose} );
-            push @COMP_ARRAY, "F $Fieldnumber \"$REFERENCE_HASH{$Reference}{$HeaderColumnName}\" $Other \"$HeaderColumnName\""; # start pushing conponent info onto the COMP_ARRAY 
+            warn "  -W- Change F $FieldNumber with Value:$FieldValue to $REFERENCE_HASH{$Reference}{$HeaderColumnName} and Field Name:$Fieldname to $HeaderColumnName\n" if ( $OPTIONS{verbose} );
+            push @COMP_ARRAY, "F $FieldNumber \"$REFERENCE_HASH{$Reference}{$HeaderColumnName}\" $Other \"$HeaderColumnName\""; # start pushing conponent info onto the COMP_ARRAY 
+            $WARNING = 1 if ($OPTIONS{verbose});
           }
         }
         else
         {
-          warn "  -W- Removing F $Fieldnumber with Value:$FieldValue and Field Name :$Fieldname\n" if ( $OPTIONS{verbose} );
+          warn "  -W- Removing F $FieldNumber with Value:$FieldValue and Field Name :$Fieldname\n" if ( $OPTIONS{verbose} );
+          $WARNING = 1 if ($OPTIONS{verbose});
         }
       }
       elsif ($LAST_FIELD)
       {
         if ( $LAST_FIELD_NUMBER < $TOTAL_FIELDS )
         {
-          for (my $Fieldnumber = $LAST_FIELD_NUMBER+1; $Fieldnumber < $TOTAL_FIELDS; $Fieldnumber++)
+          for (my $FieldNumber = $LAST_FIELD_NUMBER+1; $FieldNumber < $TOTAL_FIELDS; $FieldNumber++)
           {
-            my $HeaderColumnName = $HEADER_ARRAY[$Fieldnumber];
-            warn "  -W- Creating F $Fieldnumber with Value:NA and Field Name :$HeaderColumnName\n" if ( $OPTIONS{verbose} );
-            push @COMP_ARRAY, "F $Fieldnumber \"NA\" $Other \"$HeaderColumnName\""; # start pushing conponent info onto the COMP_ARRAY 
+            my $HeaderColumnName = $HEADER_ARRAY[$FieldNumber];
+            warn "  -W- Creating F $FieldNumber with Value:NA and Field Name :$HeaderColumnName\n" if ( $OPTIONS{verbose} );
+            push @COMP_ARRAY, "F $FieldNumber \"NA\" $Other \"$HeaderColumnName\""; # start pushing conponent info onto the COMP_ARRAY 
+            $WARNING = 1 if ($OPTIONS{verbose});
           }
         }
         $LAST_FIELD = 0;
@@ -494,32 +525,6 @@ sub check_options
 
   if ($OPTIONS{help}) {&print_help} # this will exit the program
   return(%OPTIONS);
-}
-
-# NOTE: this is the format to make this work
-# my %option_H;
-#  GetOptions( \%option_H,
-#    "help"   => ,	# flag/boolean (0=false|1=true)
-#    "file=s" => ,	# string
-#    "name=s" => ,	# string
-#    "grep=s" => ,	# string
-#    "debug=i"=> ,	# integer
-#    "verbose"=> );	# flag/boolean (0=false|1=true)
-# &show_options(\%option_H);
-
-sub show_options
-{
-  my ($hash_ref) = shift;
-  my %option_H = %$hash_ref;
-  if ($option_H{"verbose"})
-  {
-    warn "Checking Options for $0\n";
-    warn "VERBOSE - Options sellected are as follows:\n";
-    foreach my $KEY (keys %option_H)
-    {
-      warn "  $KEY = $option_H{$KEY}\n";
-    }
-  }
 }
 
 sub end_program
