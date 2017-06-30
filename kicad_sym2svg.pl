@@ -1,7 +1,8 @@
 #!/usr/bin/perl
 
 use Getopt::Long;
-use lib "$ENV{HOME}/Dropbox/bin/perl";
+#using the $ENV{HOME}/ is ~/ in bash
+use lib "$ENV{HOME}/<Local Path to the svg_gen.pm file>";
 use svg_gen;
 
 my $input_file;
