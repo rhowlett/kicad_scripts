@@ -1,4 +1,5 @@
 # kicad_scripts
+Note to the reader.  I generally write CLI scripts in bash, python, perl, C, and C++.  This is some really old stuff I just wanted to document and it gave me an excuse to learn a little about git.
 ---
 * This is a number of **CLI** scripts written in various languages like **_c, bash, perl, and python_.**
  These scripts are workarounds for things that are not easy to do or take a long time to do in the kicad GUI.
@@ -10,6 +11,7 @@
 | File                          | What it does                                               |
 | ----------------------------- |------------------------------------------------------------|
 | README.md                     | The file you are reading |
+| extract_pcbnew.pl             | CLI program using perl to modify Kicad pcbnew files (just wanted to write a s-expression parser) |
 | kicad_sch_standardize.sh      | Example of how you can used kicad_sch_font_resize.pl and kicad_sch_page_order.pl |
 | kicad_sch_update_bom.sh       | Example of how you can use kicad_bom2sch.pl |
 |	kicad_pcb_change_ref_num.sh   | Changes refence number based on sheetnumber\*100 numbering style |
@@ -18,6 +20,9 @@
 |	kicad_bom2sch.pl              | Takes the input of a CSV bom file and updates fields in the schematic to match exactly |
 | kicad_sch_font_resize.pl      | CLI program using perl to modify the font sizes of a schematic |
 |	kicad_sch_page_order.pl       | CLI program to change to order of the pages in a hierarchial schematic |
+
+## extract_pcbnew.pl
+I think it worked... It's been too long since I played with this.  This was written before most of this stuff could be done in python. Just a nice reference to a S-Expression parse and modification (technique can be used for other things too.)
 
 ## kicad_sch_standardize.sh
 <dl>
