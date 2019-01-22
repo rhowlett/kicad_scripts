@@ -1,4 +1,8 @@
 #!/usr/bin/perl
+
+# NOTE: main program is at the end of this file
+
+use Getopt::Long;
 use Text::Balanced qw(extract_delimited extract_bracketed);
 
 my $usage = "
@@ -27,8 +31,8 @@ DESCRIPTION
   -ny <val>        Moves the PCB Y cordinates, based on the Auxiray Axis
                    NOTE: Can not be used with coresponding ox AND/OR oy options
 
-  -ox              This will offset the PCB in the X direction by this ammount in mm
-  -oy              This will offset the PCB in the Y direction by this ammount in mm
+  -ox <val>        This will offset the PCB in the X direction by this ammount in mm
+  -oy <val>        This will offset the PCB in the Y direction by this ammount in mm
                    NOTE: Can not be used with coresponding nx AND/OR ny options
 
   -layer or -l     This option will swap two layers between the top and bottom layers
@@ -89,45 +93,98 @@ $option_hash{ny} = 25.4; #
 $option_hash{ox} = 0; #default = no offset in the x direction
 $option_hash{oy} = 0; #default = no offset in the y direction
 
-# BEGIN Checking Options
-if ( $option_hash{nx} )
+sub check_options()
 {
-  if ($option_hash{ox} != 0)
-  {
-    warn "ERROR - options nx and ox both can not be set\n";
-  }
-  elsif ($option_hash{aux_axis})
-  {
-    warn "Setting - options aux_axis will move aux_axis(X) to $option_hash{nx}\n";
-  }
-}
-elsif ( $option_hash{ox} != 0 )
-{
-  if ($option_hash{aux_axis})
-  {
-    warn "Setting - options aux_axis will offset aux_axis(X) to $option_hash{ox}\n";
-  }
-}
+  GetOptions(\%option_hash,
+    "help",		# flag/boolean (0=false|1=true)
+    "nx=f",
+    "ox=f",
+    "ny=f",
+    "oy=f",
+    "layer=s",
+    "base=s",
+    "reference=i",
+    "cat",
+    "sz_drawings",	# TBD
+    "sz_pcb_outline",	# TBD
+    "sz_dimensions",	# TBD
+    "sz_text",		# TBD
+    "rm_drawings",	# TBD
+    "rm_tracks",	# TBD
+    "rm_zones",		# TBD
+    "rm_fill",		# TBD
+    "rm_text",		# TBD
+    "rm_pcb_outline",	# TBD
+    "rm_dimensions",	# TBD
+    "3dshapes",		# TBD
+    "file=s",
+    "aux_axis=f",
+    "debug=i",		# integer
+    "verbose");		# flag/boolean (0=false|1=true)
 
-if ( $option_hash{ny} )
-{
-  if ($option_hash{oy} != 0)
+  # BEGIN Checking Options
+  if ($option_hash{"verbose"})
   {
-    warn "ERROR - options ny and oy both can not be set\n";
+    warn "Checking Options for $0\n";
+    warn "-I- Options sellected are as follows:\n";
+    foreach my $key (keys %option_hash)
+    {
+      warn "  $key = $option_hash{$key}\n";
+    }
+    warn "-I- End of sellected options.\n";
   }
-  elsif ($option_hash{aux_axis})
+
+  if ( !$option_hash{file} )
   {
-    warn "Setting - options aux_axis will move aux_axis(Y) to $option_hash{ny}\n";
+    warn "-E- options file is not set\n";
+    $option_hash{help} = 1;
   }
+  if ( $option_hash{nx} )
+  {
+    if ($option_hash{ox} != 0)
+    {
+      warn "-E- options nx and ox both can not be set\n";
+      $option_hash{help} = 1;
+    }
+    elsif ($option_hash{aux_axis})
+    {
+      warn "-W- Setting options aux_axis will move aux_axis(X) to $option_hash{nx}\n";
+    }
+  }
+  elsif ( $option_hash{ox} != 0 )
+  {
+    if ($option_hash{aux_axis})
+    {
+      warn "-W- Setting options aux_axis will offset aux_axis(X) to $option_hash{ox}\n";
+    }
+  }
+  
+  if ( $option_hash{ny} )
+  {
+    if ($option_hash{oy} != 0)
+    {
+      warn "-E- options ny and oy both can not be set\n";
+      $option_hash{help} = 1;
+    }
+    elsif ($option_hash{aux_axis})
+    {
+      warn "-W- Setting options aux_axis will move aux_axis(Y) to $option_hash{ny}\n";
+    }
+  }
+  elsif ( $option_hash{oy} != 0 )
+  {
+    if ($option_hash{aux_axis})
+    {
+      warn "-W- Setting options aux_axis will offset aux_axis(Y) to $option_hash{oy}\n";
+    }
+  }
+  if ($option_hash{help})
+  {
+    warn $usage;
+    exit(1);
+  }
+  # END Checking Options
 }
-elsif ( $option_hash{oy} != 0 )
-{
-  if ($option_hash{aux_axis})
-  {
-    warn "Setting - options aux_axis will offset aux_axis(Y) to $option_hash{oy}\n";
-  }
-}
-# END Checking Options
 
 
 $option{base} = 100; #
@@ -369,8 +426,10 @@ sub parse_module
   }
 }
 
+# ------ Begine Program ------
+&check_options();
 my $text;
-open ( BRD, "<$ARGV[0]") or die("ha ha");
+open ( BRD, "<$option_hash{file}") or die("$usage \n-E- ha ha could not open \'$option_hash{file}\', exiting is a bad way...");
 
 while (<BRD>)
 {
