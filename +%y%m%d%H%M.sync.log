@@ -1,2 +1,14 @@
 You are running Linux.
 Already up to date.
+On branch master
+Your branch is ahead of 'origin/master' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	new file:   +%y%m%d%H%M.sync.log
+
+[master 1629c09] rhowlett - Update 251125082451 - Linux:X399-AORUS-XTREME
+ 1 file changed, 2 insertions(+)
+ create mode 100644 +%y%m%d%H%M.sync.log
+-W- DONE
